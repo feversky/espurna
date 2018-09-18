@@ -59,7 +59,7 @@ my92xx * _my92xx;
 ARRAYINIT(unsigned char, _light_channel_map, MY92XX_MAPPING);
 #endif
 
-#if LIGHT_PROVIDER == LIGHT_PROVIDER_DIMMER
+#if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
 NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang800KbpsMethod> *strip = NULL;
 #endif
 // Gamma Correction lookup table (8 bit)
@@ -1096,8 +1096,8 @@ void lightSetup() {
             #error "LIGHT_CH1_PIN should be defined!"
         #endif
         _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
-        _light_channel.push_back((channel_t) {1, 0, true, 0, 0, 0});
-        _light_channel.push_back((channel_t) {2, 0, true, 0, 0, 0});
+        _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
+        _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
         strip = new NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang800KbpsMethod>(LIGHT_MAX_LEDS, LIGHT_CH1_PIN);
         strip->Begin();
         strip->ClearTo(0);
