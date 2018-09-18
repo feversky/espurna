@@ -254,6 +254,34 @@
 // Itead Studio boards
 // -----------------------------------------------------------------------------
 
+#elif defined(ITEAD_SONOFF_BASIC_PIR_WS2812)
+
+    // Info
+    #define MANUFACTURER        "ITEAD"
+    #define DEVICE              "SONOFF_BASIC"
+
+    // Buttons
+    #define BUTTON1_PIN         0
+    #define BUTTON1_MODE        BUTTON_PUSHBUTTON | BUTTON_DEFAULT_HIGH
+    #define BUTTON1_RELAY       1
+
+    // Light
+    #define LIGHT_CHANNELS      1
+    #define LIGHT_CH1_PIN       14
+    #define LIGHT_CH1_INVERSE   0
+    #define LIGHT_MAX_LEDS      9
+    // #define BUTTON2_PIN         14
+    // #define BUTTON2_MODE        BUTTON_SWITCH | BUTTON_SET_PULLUP | BUTTON_DEFAULT_HIGH
+    // #define BUTTON2_RELAY       1
+
+    // Relays
+    #define RELAY1_PIN          12
+    #define RELAY1_TYPE         RELAY_TYPE_NORMAL
+
+    // LEDs
+    #define LED1_PIN            13
+    #define LED1_PIN_INVERSE    1
+
 #elif defined(ITEAD_SONOFF_BASIC)
 
     // Info

@@ -23,6 +23,9 @@ extern "C" {
 }
 #endif
 
+#if LIGHT_PROVIDER == LIGHT_PROVIDER_DIMMER
+#include <NeoPixelBus.h>
+#endif
 // -----------------------------------------------------------------------------
 
 Ticker _light_save_ticker;
@@ -56,6 +59,9 @@ my92xx * _my92xx;
 ARRAYINIT(unsigned char, _light_channel_map, MY92XX_MAPPING);
 #endif
 
+#if LIGHT_PROVIDER == LIGHT_PROVIDER_DIMMER
+NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang800KbpsMethod> *strip = NULL;
+#endif
 // Gamma Correction lookup table (8 bit)
 // TODO: move to PROGMEM
 const unsigned char _light_gamma_table[] = {
@@ -447,6 +453,11 @@ void _lightProviderUpdate() {
             pwm_set_duty(_toPWM(i), i);
         }
         pwm_start();
+
+    #endif
+
+    #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
+
 
     #endif
 
@@ -1077,6 +1088,16 @@ void lightSetup() {
 
     #endif
 
+    #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
+        #ifndef LIGHT_CH1_PIN
+            #error "LIGHT_CH1_PIN should be defined!"
+        #endif
+        _light_channel.push_back((channel_t) {LIGHT_CH1_PIN, LIGHT_CH1_INVERSE, true, 0, 0, 0});
+        strip = new NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang800KbpsMethod>(LIGHT_MAX_LEDS, LIGHT_CH1_PIN);
+        strip->Begin();
+        strip->ClearTo(0);
+        strip->Show();
+    #endif
     DEBUG_MSG_P(PSTR("[LIGHT] LIGHT_PROVIDER = %d\n"), LIGHT_PROVIDER);
     DEBUG_MSG_P(PSTR("[LIGHT] Number of channels: %d\n"), _light_channel.size());
 
