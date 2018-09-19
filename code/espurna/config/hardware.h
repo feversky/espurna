@@ -261,6 +261,12 @@
     #define DEVICE              "SONOFF_BASIC"
     #define LIGHT_PROVIDER      LIGHT_PROVIDER_WS2812
 
+    #ifndef DIGITAL_SUPPORT
+    #define DIGITAL_SUPPORT      1
+    #endif
+    #define DIGITAL_PIN          3
+    #define DIGITAL_PIN_MODE     INPUT
+
     // Buttons
     #define BUTTON1_PIN         0
     #define BUTTON1_MODE        BUTTON_PUSHBUTTON | BUTTON_DEFAULT_HIGH
