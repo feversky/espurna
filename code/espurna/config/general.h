@@ -819,6 +819,10 @@
 #define LIGHT_MAX_PWM           10000        // 10000 * 200ns => 2 kHz
 #endif
 
+#if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
+#define LIGHT_MAX_PWM           255
+#endif
+
 #endif // LIGHT_MAX_PWM
 
 #ifndef LIGHT_LIMIT_PWM

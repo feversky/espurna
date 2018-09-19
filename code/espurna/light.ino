@@ -61,6 +61,7 @@ ARRAYINIT(unsigned char, _light_channel_map, MY92XX_MAPPING);
 
 #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
 NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang800KbpsMethod> *strip = NULL;
+RgbColor black(0);
 #endif
 // Gamma Correction lookup table (8 bit)
 // TODO: move to PROGMEM
@@ -456,14 +457,6 @@ void _lightProviderUpdate() {
 
     #endif
 
-    #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
-        RgbColor color(_light_channel[0].shadow, _light_channel[1].shadow, _light_channel[2].shadow);
-        for (unsigned int i=0; i < LIGHT_MAX_LEDS; i++) {
-            strip.SetPixelColor(i, color);
-        }
-        strip.Show();
-    #endif
-
 }
 
 // -----------------------------------------------------------------------------
@@ -660,6 +653,14 @@ void lightUpdate(bool save, bool forward, bool group_forward) {
     _light_steps_left = _light_use_transitions ? _light_transition_time / LIGHT_TRANSITION_STEP : 1;
     _light_transition_ticker.attach_ms(LIGHT_TRANSITION_STEP, _lightProviderUpdate);
 
+    DEBUG_MSG_P(PSTR("[LIGHT] channels %d,%d,%d\n"), _light_channel[0].value, _light_channel[1].value,_light_channel[2].value);
+    #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
+        RgbColor color(_light_channel[0].value, _light_channel[1].value, _light_channel[2].value);
+        for (unsigned int i=0; i < LIGHT_MAX_LEDS; i++) {
+            strip->SetPixelColor(i, color);
+        }
+        strip->Show();
+    #endif
     // Report channels to local broker
     #if BROKER_SUPPORT
         lightBroker();
@@ -1098,10 +1099,10 @@ void lightSetup() {
         _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
         _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
         _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
-        strip = new NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang800KbpsMethod>(LIGHT_MAX_LEDS, LIGHT_CH1_PIN);
+        strip = new NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang800KbpsMethod>(512, LIGHT_CH1_PIN);
         strip->Begin();
-        strip->ClearTo(0);
-        strip->Show();
+        strip->ClearTo(black);
+        strip->Show(); 
     #endif
 
     DEBUG_MSG_P(PSTR("[LIGHT] LIGHT_PROVIDER = %d\n"), LIGHT_PROVIDER);

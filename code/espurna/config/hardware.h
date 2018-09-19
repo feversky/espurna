@@ -259,6 +259,7 @@
     // Info
     #define MANUFACTURER        "ITEAD"
     #define DEVICE              "SONOFF_BASIC"
+    #define LIGHT_PROVIDER      LIGHT_PROVIDER_WS2812
 
     // Buttons
     #define BUTTON1_PIN         0
