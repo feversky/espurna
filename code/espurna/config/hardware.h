@@ -261,14 +261,14 @@
     #define DEVICE              "SONOFF_BASIC"
     #define LIGHT_PROVIDER      LIGHT_PROVIDER_WS2812
 
-    #define EVENTS_SUPPORT      1
-    #define EVENTS_PIN          3
+    // #define EVENTS_SUPPORT      1
+    // #define EVENTS_PIN          3
 
-    // #ifndef DIGITAL_SUPPORT
-    // #define DIGITAL_SUPPORT      1
-    // #endif
-    // #define DIGITAL_PIN          3
-    // #define DIGITAL_PIN_MODE     INPUT
+    #ifndef DIGITAL_SUPPORT
+    #define DIGITAL_SUPPORT      1
+    #endif
+    #define DIGITAL_PIN          3
+    #define DIGITAL_PIN_MODE     INPUT
 
     // Buttons
     #define BUTTON1_PIN         0
@@ -280,7 +280,8 @@
     #define LIGHT_CH1_PIN       14
     #define LIGHT_CH1_INVERSE   0
     #define LIGHT_MAX_LEDS      9
-    // #define BUTTON2_PIN         14
+
+    // #define BUTTON2_PIN         3
     // #define BUTTON2_MODE        BUTTON_SWITCH | BUTTON_SET_PULLUP | BUTTON_DEFAULT_HIGH
     // #define BUTTON2_RELAY       1
 
