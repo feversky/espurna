@@ -60,8 +60,9 @@ ARRAYINIT(unsigned char, _light_channel_map, MY92XX_MAPPING);
 #endif
 
 #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
-NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod> *strip = NULL;
-RgbColor black(0);
+NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod> *_strip = NULL;
+RgbColor _color_black(0);
+RgbColor _color_last;
 #endif
 // Gamma Correction lookup table (8 bit)
 // TODO: move to PROGMEM
@@ -653,14 +654,8 @@ void lightUpdate(bool save, bool forward, bool group_forward) {
     _light_steps_left = _light_use_transitions ? _light_transition_time / LIGHT_TRANSITION_STEP : 1;
     _light_transition_ticker.attach_ms(LIGHT_TRANSITION_STEP, _lightProviderUpdate);
 
-    DEBUG_MSG_P(PSTR("[LIGHT] channels %d,%d,%d\n"), _light_channel[0].value, _light_channel[1].value,_light_channel[2].value);
-    #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
-        RgbColor color(_light_channel[0].value, _light_channel[1].value, _light_channel[2].value);
-        for (unsigned int i=0; i < LIGHT_MAX_LEDS; i++) {
-            strip->SetPixelColor(i, color);
-        }
-        strip->Show();
-    #endif
+    // DEBUG_MSG_P(PSTR("[LIGHT] channels %d,%d,%d\n"), _light_channel[0].value, _light_channel[1].value,_light_channel[2].value);
+
     // Report channels to local broker
     #if BROKER_SUPPORT
         lightBroker();
@@ -1039,6 +1034,22 @@ void _lightConfigure() {
 
 }
 
+void _lightLoop() {
+    #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812        
+        if (_color_last.R != _light_channel[0].value ||
+            _color_last.G != _light_channel[1].value ||
+            _color_last.B != _light_channel[2].value) {
+            _color_last.R = _light_channel[0].value;
+            _color_last.G = _light_channel[1].value;
+            _color_last.B = _light_channel[2].value;
+            for (unsigned int i=0; i < LIGHT_MAX_LEDS; i++) {
+                _strip->SetPixelColor(i, _color_last);
+            }
+            _strip->Show(); //Show could only be called in loop()
+        }                
+    #endif
+}
+
 void lightSetup() {
 
     #ifdef LIGHT_ENABLE_PIN
@@ -1099,10 +1110,10 @@ void lightSetup() {
         _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
         _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
         _light_channel.push_back((channel_t) {0, 0, true, 0, 0, 0});
-        strip = new NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod>(512, LIGHT_CH1_PIN);
-        strip->Begin();
-        strip->ClearTo(black);
-        strip->Show(); 
+        _strip = new NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod>(512, LIGHT_CH1_PIN);
+        _strip->Begin();
+        _strip->ClearTo(_color_black);
+        _strip->Show(); 
     #endif
 
     DEBUG_MSG_P(PSTR("[LIGHT] LIGHT_PROVIDER = %d\n"), LIGHT_PROVIDER);
@@ -1137,6 +1148,7 @@ void lightSetup() {
         _lightConfigure();
     });
 
+    espurnaRegisterLoop(_lightLoop);
 }
 
 #endif // LIGHT_PROVIDER != LIGHT_PROVIDER_NONE
