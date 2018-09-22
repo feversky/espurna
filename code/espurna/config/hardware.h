@@ -279,7 +279,7 @@
     #define LIGHT_CHANNELS      1
     #define LIGHT_CH1_PIN       14
     #define LIGHT_CH1_INVERSE   0
-    #define LIGHT_MAX_LEDS      9
+    #define LIGHT_MAX_LEDS      8
 
     // #define BUTTON2_PIN         3
     // #define BUTTON2_MODE        BUTTON_SWITCH | BUTTON_SET_PULLUP | BUTTON_DEFAULT_HIGH

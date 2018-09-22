@@ -62,7 +62,7 @@ ARRAYINIT(unsigned char, _light_channel_map, MY92XX_MAPPING);
 #if LIGHT_PROVIDER == LIGHT_PROVIDER_WS2812
 NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod> *_strip = NULL;
 RgbColor _color_black(0);
-RgbColor _color_last;
+RgbColor _color_last(0);
 #endif
 // Gamma Correction lookup table (8 bit)
 // TODO: move to PROGMEM
