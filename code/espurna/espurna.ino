@@ -187,7 +187,9 @@ void setup() {
     #if UART_MQTT_SUPPORT
         uartmqttSetup();
     #endif
-
+    #if CURTAIN_SUPPORT
+        curtainSetup();
+    #endif
 
     // 3rd party code hook
     #if USE_EXTRA

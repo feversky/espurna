@@ -61,11 +61,25 @@
 // Development boards
 // -----------------------------------------------------------------------------
 
+#elif defined(NODEMCU_LOLIN_CURTAIN)
+
+    // Info
+    #define MANUFACTURER        "NODEMCU"
+    #define DEVICE              "CURTAIN"
+    #define CURTAIN_SUPPORT     1
+    #define ENCODER1_PIN        4
+    #define ENCODER2_PIN        5
+    #define RELAY1_PIN          12
+    #define RELAY2_PIN          13
+
+
 #elif defined(NODEMCU_LOLIN)
 
     // Info
     #define MANUFACTURER        "NODEMCU"
     #define DEVICE              "LOLIN"
+
+    // #define HEARTBEAT_INTERVAL  200
 
     // Buttons
     #define BUTTON1_PIN         0
@@ -257,17 +271,18 @@
 #elif defined(ITEAD_SONOFF_BASIC_PIR_WS2812)
 
     // Info
-    #define MANUFACTURER        "ITEAD"
-    #define DEVICE              "SONOFF_BASIC"
-    #define LIGHT_PROVIDER      LIGHT_PROVIDER_WS2812
+    #define MANUFACTURER            "ITEAD"
+    #define DEVICE                  "SONOFF_BASIC"
+    #define LIGHT_PROVIDER          LIGHT_PROVIDER_WS2812
+    #define DEBUG_SERIAL_SUPPORT    0
 
     // #define EVENTS_SUPPORT      1
-    // #define EVENTS_PIN          3
+    // #define EVENTS_PIN          1
 
     #ifndef DIGITAL_SUPPORT
     #define DIGITAL_SUPPORT      1
     #endif
-    #define DIGITAL_PIN          3
+    #define DIGITAL_PIN          1
     #define DIGITAL_PIN_MODE     INPUT
 
     // Buttons
@@ -279,7 +294,7 @@
     #define LIGHT_CHANNELS      1
     #define LIGHT_CH1_PIN       14
     #define LIGHT_CH1_INVERSE   0
-    #define LIGHT_MAX_LEDS      8
+    #define LIGHT_MAX_LEDS      7
 
     // #define BUTTON2_PIN         3
     // #define BUTTON2_MODE        BUTTON_SWITCH | BUTTON_SET_PULLUP | BUTTON_DEFAULT_HIGH
