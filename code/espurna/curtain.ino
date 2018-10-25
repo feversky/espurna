@@ -36,6 +36,16 @@ void _curtainInitCommands() {
         curtainLearnDirection();
         DEBUG_MSG_P(PSTR("+OK\n"));
     });
+
+    settingsRegisterCommand(F("CURTAIN.OPEN"), [](Embedis* e) {
+        curtainOperation(100);
+        DEBUG_MSG_P(PSTR("+OK\n"));
+    });
+
+    settingsRegisterCommand(F("CURTAIN.CLOSE"), [](Embedis* e) {
+        curtainOperation(0);
+        DEBUG_MSG_P(PSTR("+OK\n"));
+    });
 }
 
 #endif
@@ -49,14 +59,14 @@ void curtainLearnDirection(){
     DEBUG_MSG_P(PSTR("learning direction\n"));
     relayStatus(0, false, false, false);
     relayStatus(1, false, false, false);
-    delayMicroseconds(3000);
+    delay(3000);
     relayStatus(0, true, false, false);
-    delayMicroseconds(1000);
+    delay(1000);
     relayStatus(0, false, false, false);
     int32_t pos0 = _encoder->read();
-    delayMicroseconds(2000);
+    delay(2000);
     relayStatus(1, true, false, false);
-    delayMicroseconds(1000);
+    delay(1000);
     relayStatus(1, false, false, false);
     int32_t pos1 = _encoder->read();
     _relay_open = abs(pos0) < abs(pos1) ? 1 : 0;
@@ -76,7 +86,7 @@ void curtainOperation(uint8_t pos_percent){
     }
 
     if (millis() - last_operation_time < CURTAIN_PROTECT_TIME) {
-        delayMicroseconds(millis() - last_operation_time);
+        delay(millis() - last_operation_time);
     }
 
     int32_t target_pos = abs(_MAX_POSITION * pos_percent / 100);
@@ -85,7 +95,7 @@ void curtainOperation(uint8_t pos_percent){
     bool condition = true;
     do {
         relayStatus(relay, true, false, false);
-        delayMicroseconds(1);
+        delayMicroseconds(100);
         condition = initial_pos < target_pos ? abs(_encoder->read()) < target_pos : abs(_encoder->read()) > target_pos;
     } while (condition);
     relayStatus(relay, false, false, false);
