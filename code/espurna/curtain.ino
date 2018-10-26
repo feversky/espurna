@@ -15,8 +15,9 @@ Encoder * _encoder;
 int32_t   _current_position_abs;
 int8_t    _current_position_prc;
 uint32_t  _MAX_POSITION;
-uint8_t   _relay_open;
+uint8_t   _relay_open = 0xFF;
 uint8_t   _curtain_state = CURTAIN_STATE_IDLE;
+uint32_t  _curtain_target_relay = 0;
 uint32_t  _curtain_target_position = 0;
 uint32_t  _curtain_start_time = 0;
 
@@ -72,22 +73,6 @@ void curtainLearnDirection(){
     DEBUG_MSG_P(PSTR("learning direction\n"));
     _curtain_state = CURTAIN_STATE_LEARN;
     _curtain_start_time = millis();
-    // DEBUG_MSG_P(PSTR("learning direction\n"));
-    // relayStatus(0, false, false, false);
-    // relayStatus(1, false, false, false);
-    // delay(3000);
-    // relayStatus(0, true, false, false);
-    // delay(1000);
-    // relayStatus(0, false, false, false);
-    // int32_t pos0 = _encoder->read();
-    // delay(2000);
-    // relayStatus(1, true, false, false);
-    // delay(1000);
-    // relayStatus(1, false, false, false);
-    // int32_t pos1 = _encoder->read();
-    // _relay_open = abs(pos0) < abs(pos1) ? 1 : 0;
-    // DEBUG_MSG_P(PSTR("learning finished\n"));
-    // setSetting("relayOpen", _relay_open);
 }
 
 void curtainOperation(uint8_t pos_percent){
@@ -105,6 +90,7 @@ void curtainOperation(uint8_t pos_percent){
     }
 
     _curtain_target_position = _MAX_POSITION * pos_percent / 100;
+    _curtain_target_relay = _curtain_initial_position < _curtain_target_position ? _relay_open : 1 - _relay_open;
     _curtain_state = CURTAIN_STATE_RUN;
     _curtain_start_time = millis();
     
@@ -209,25 +195,20 @@ void curtainLoop(){
         }
         relayStatus(1, false, false, false);
         _relay_open = abs(pos0) < abs(pos1) ? 1 : 0;
-        DEBUG_MSG_P(PSTR("learning finished: open relay %d\n"), _relay_open);
+        DEBUG_MSG_P(PSTR("learning finished: open relay is %d\n"), _relay_open);
         setSetting("relayOpen", _relay_open);
         _curtain_state = CURTAIN_STATE_IDLE;
     }
     else if (_curtain_state == CURTAIN_STATE_RUN)
     {
-        int32_t target_pos = _curtain_target_position;
-        int32_t initial_pos = abs(_encoder->read());
-        uint8_t relay = initial_pos < target_pos ? _relay_open : 1 - _relay_open;
-        bool condition = true;
-        condition = initial_pos < target_pos ? abs(_encoder->read()) < target_pos : abs(_encoder->read()) > target_pos;
-
-        relayStatus(relay, true, false, false);
-        if (condition)
+        if (abs(_encoder->read()) < _curtain_target_position)
         {
+            relayStatus(_curtain_target_relay, true, false, false);
             return;
         }
-        relayStatus(relay, false, false, false);
-        _curtain_state = CURTAIN_STATE_IDLE;        
+        relayStatus(_curtain_target_relay, false, false, false);
+        _curtain_state = CURTAIN_STATE_IDLE;    
+        _curtain_target_relay = 0xFF;    
     }
 }
 
