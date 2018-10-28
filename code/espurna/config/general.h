@@ -755,8 +755,9 @@
 
 #define MQTT_ACTION_RESET           "reboot"    // RESET MQTT topic particle
 
-#define MQTT_TOPIC_CURTAIN          "curtain"
-#define MQTT_TOPIC_CURTAIN_POS      "curtain_pos"
+#define MQTT_TOPIC_CURTAIN_CMD      "curtain_cmd"
+#define MQTT_TOPIC_CURTAIN_SET_POS  "curtain_set_pos"
+#define MQTT_TOPIC_CURTAIN_STATUS   "curtain_status"
 
 #define MQTT_MESSAGE_ID_SHIFT       1000        // Store MQTT message id into EEPROM every these many
 
