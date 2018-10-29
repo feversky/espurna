@@ -63,10 +63,15 @@ void _curtainInitCommands()
         DEBUG_MSG_P(PSTR("+OK\n"));
     });
 
-    // settingsRegisterCommand(F("CURTAIN.SPEEDTHRESHOLD"), [](Embedis *e) {
-    //     _SPEED_THRESHOLD = 0;
-    //     DEBUG_MSG_P(PSTR("+OK\n"));
-    // });
+    settingsRegisterCommand(F("CURTAIN.SPEEDTHRESHOLD"), [](Embedis *e) {
+        if (e->argc > 1) {
+            _SPEED_THRESHOLD = String(e->argv[1]).toInt();
+            DEBUG_MSG_P(PSTR("+OK\n"));
+        }
+        else{
+            DEBUG_MSG_P(PSTR("Wrong number of arguments\n"));
+        }
+    });
 
     settingsRegisterCommand(F("CURTAIN.REPORT"), [](Embedis *e) {
         DEBUG_MSG_P(PSTR("Current position: %d\n"), _encoder->read());
@@ -246,6 +251,9 @@ void curtainSetup()
 
 void curtainLoop()
 {
+    static uint32_t last_read_idle = 0;
+    static int32_t last_pos_idle = 0;
+
     static unsigned long last_hbeat = 0;
     if (millis() - last_hbeat > 600000) {
         last_hbeat = millis();
@@ -270,11 +278,11 @@ void curtainLoop()
         relayStatus(0, false, false, false);
         _RELAY_CLOSE = abs(pos0) < abs(pos1) ? 0 : 1;
         DEBUG_MSG_P(PSTR("learning finished: close relay is %d\n"), _RELAY_CLOSE);
-        setSetting(SETTING_INITPOSITION, _RELAY_CLOSE);
+        setSetting(SETTING_INITPOSITION, _encoder->read());
         _curtain_state = CURTAIN_STATE_IDLE;
 
-        _SPEED_THRESHOLD = abs(pos1 - pos0) * 60 / 100;
-        setSetting(SETTING_SPEEDTHRESHOLD, _SPEED_THRESHOLD);
+        // _SPEED_THRESHOLD = abs(pos1 - pos0);
+        // setSetting(SETTING_SPEEDTHRESHOLD, _SPEED_THRESHOLD);
         curtainMQTT();
     }
     else if (_curtain_state == CURTAIN_STATE_RUN)
@@ -282,12 +290,13 @@ void curtainLoop()
         //todo: optimze stop detection
         static uint32_t last_read = 0;
         static int32_t last_pos = 0;
-        if (millis() - last_read > 1000)
+        if (millis() - last_read > 1000 && millis() - _curtain_start_time > 2000)
         {
             int32_t current_pos = _encoder->read();
             last_read = millis();
             if (abs(current_pos - last_pos) <= _SPEED_THRESHOLD)
             {
+                DEBUG_MSG_P(PSTR("stopped due to external force\n"));
                 relayStatus(_curtain_target_relay, false, false, false);
                 _curtain_state = CURTAIN_STATE_IDLE;
                 _curtain_target_relay = 0xFF;
@@ -309,19 +318,20 @@ void curtainLoop()
             return;
         }
         relayStatus(_curtain_target_relay, false, false, false);
+        last_pos_idle = _encoder->read();
+
         _curtain_state = CURTAIN_STATE_IDLE;
         _curtain_target_relay = 0xFF;
         setSetting(SETTING_INITPOSITION, _encoder->read());
         curtainMQTT();
+
     }
     else{
         relayStatus(0, false, false, false);
         relayStatus(1, false, false, false);
 
-        static uint32_t last_read_idle = 0;
-        static int32_t last_pos_idle = 0;
         if (millis() - last_read_idle > 3000){
-            uint32_t move = _encoder->read() - last_pos_idle;
+            int32_t move = _encoder->read() - last_pos_idle;
             if (abs(move) > 20) {                
                 if (move * _MAX_POSITION > 0) {
                     curtainOperation(100);
