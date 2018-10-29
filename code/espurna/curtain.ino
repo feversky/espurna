@@ -14,10 +14,12 @@
 #define SETTING_RELAYCLOSE "CURTAIN_RELAYCLOSE"
 #define SETTING_MAXPOSITION "CURTAIN_MAXPOSITION"
 #define SETTING_INITPOSITION "CURTAIN_INITPOSITION"
+#define SETTING_SPEEDTHRESHOLD "CURTAIN_SPEEDTHRESHOLD"
 
 Encoder *_encoder;
 int32_t _current_position_abs;
 int8_t _current_position_prc;
+int32_t _SPEED_THRESHOLD = 5;
 int32_t _MAX_POSITION;
 int32_t _INIT_POSITION = 0;
 uint8_t _RELAY_CLOSE = 0xFF;
@@ -61,10 +63,16 @@ void _curtainInitCommands()
         DEBUG_MSG_P(PSTR("+OK\n"));
     });
 
+    // settingsRegisterCommand(F("CURTAIN.SPEEDTHRESHOLD"), [](Embedis *e) {
+    //     _SPEED_THRESHOLD = 0;
+    //     DEBUG_MSG_P(PSTR("+OK\n"));
+    // });
+
     settingsRegisterCommand(F("CURTAIN.REPORT"), [](Embedis *e) {
         DEBUG_MSG_P(PSTR("Current position: %d\n"), _encoder->read());
         DEBUG_MSG_P(PSTR("End position: %d\n"), _MAX_POSITION);
         DEBUG_MSG_P(PSTR("Close relay: %d\n"), _RELAY_CLOSE);
+        DEBUG_MSG_P(PSTR("Speed threshold: %d\n"), _SPEED_THRESHOLD);
         DEBUG_MSG_P(PSTR("Current state: %d\n"), _curtain_state);
         DEBUG_MSG_P(PSTR("+OK\n"));
     });
@@ -219,6 +227,12 @@ void curtainSetup()
         _INIT_POSITION = getSetting(SETTING_INITPOSITION).toInt();
     }
     _encoder->write(_INIT_POSITION);
+
+    if (hasSetting(SETTING_SPEEDTHRESHOLD))
+    {
+        _SPEED_THRESHOLD = getSetting(SETTING_SPEEDTHRESHOLD).toInt();
+    }
+
 #if TERMINAL_SUPPORT
     _curtainInitCommands();
 #endif
@@ -238,73 +252,51 @@ void curtainLoop()
         curtainMQTT();
     }
 
-    //todo: optimze stop detection
-    static uint32_t last_read = 0;
-    static int32_t last_pos = 0;
-    static uint8_t stop_counter = 0;
-    if (millis() - last_read > 1000)
-    {
-        if (_curtain_state == CURTAIN_STATE_RUN)
-        {
-            int32_t current_pos = _encoder->read();
-            last_read = millis();
-            if (current_pos - last_pos == 0)
-            {
-                stop_counter++;
-            }
-            last_pos = _encoder->read();
-            if (stop_counter > 3)
-            {
-                _curtain_state = CURTAIN_STATE_IDLE;
-                _curtain_target_relay = 0xFF;
-                setSetting(SETTING_INITPOSITION, _encoder->read());
-            }
-        }
-        // else if (_curtain_state == CURTAIN_STATE_IDLE && _encoder->read() != getSetting("SETTING_INITPOSITION"))
-        // {
-        //     setSetting(SETTING_INITPOSITION, _encoder->read());            
-        // }
-    }
-    else
-    {
-        stop_counter = 0;
-    }
-
     if (_curtain_state == CURTAIN_STATE_LEARN)
     {
         static int32_t pos0, pos1;
         if (millis() < _curtain_start_time + 1000)
         {
             relayStatus(0, false, false, false);
-            relayStatus(1, false, false, false);
+            pos0 = _encoder->read();
             return;
         }
         if (millis() < _curtain_start_time + 2000)
         {
             relayStatus(0, true, false, false);
-            pos0 = _encoder->read();
-            return;
-        }
-        if (millis() < _curtain_start_time + 3000)
-        {
-            relayStatus(0, false, false, false);
-            return;
-        }
-        if (millis() < _curtain_start_time + 4000)
-        {
-            relayStatus(1, true, false, false);
             pos1 = _encoder->read();
             return;
         }
-        relayStatus(1, false, false, false);
-        _RELAY_CLOSE = abs(pos0) < abs(pos1) ? 1 : 0;
+        relayStatus(0, false, false, false);
+        _RELAY_CLOSE = abs(pos0) < abs(pos1) ? 0 : 1;
         DEBUG_MSG_P(PSTR("learning finished: close relay is %d\n"), _RELAY_CLOSE);
         setSetting(SETTING_INITPOSITION, _RELAY_CLOSE);
         _curtain_state = CURTAIN_STATE_IDLE;
+
+        _SPEED_THRESHOLD = abs(pos1 - pos0) * 60 / 100;
+        setSetting(SETTING_SPEEDTHRESHOLD, _SPEED_THRESHOLD);
         curtainMQTT();
     }
     else if (_curtain_state == CURTAIN_STATE_RUN)
-    {
+    {       
+        //todo: optimze stop detection
+        static uint32_t last_read = 0;
+        static int32_t last_pos = 0;
+        if (millis() - last_read > 1000)
+        {
+            int32_t current_pos = _encoder->read();
+            last_read = millis();
+            if (abs(current_pos - last_pos) <= _SPEED_THRESHOLD)
+            {
+                relayStatus(_curtain_target_relay, false, false, false);
+                _curtain_state = CURTAIN_STATE_IDLE;
+                _curtain_target_relay = 0xFF;
+                setSetting(SETTING_INITPOSITION, _encoder->read());
+                curtainMQTT();
+            }
+            last_pos = _encoder->read();
+        }
+
         // 5  0 -20 -200(max position), _curtain_target_position is abs value
         int8_t sign = (_MAX_POSITION > 0) - (_MAX_POSITION < 0);
         bool unfinished = _curtain_target_relay == _RELAY_CLOSE ? 
@@ -326,6 +318,21 @@ void curtainLoop()
         relayStatus(0, false, false, false);
         relayStatus(1, false, false, false);
 
+        static uint32_t last_read_idle = 0;
+        static int32_t last_pos_idle = 0;
+        if (millis() - last_read_idle > 3000){
+            uint32_t move = _encoder->read() - last_pos_idle;
+            if (abs(move) > 20) {                
+                if (move * _MAX_POSITION > 0) {
+                    curtainOperation(100);
+                }
+                else {
+                    curtainOperation(0);
+                }              
+            }
+            last_pos_idle = _encoder->read();
+            last_read_idle = millis();            
+        }
     }
 }
 
