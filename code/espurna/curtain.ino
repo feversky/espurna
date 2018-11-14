@@ -10,6 +10,7 @@
 #define CURTAIN_STATE_IDLE 0x01
 #define CURTAIN_STATE_LEARN 0x02
 #define CURTAIN_STATE_RUN 0x03
+#define CURTAIN_STATE_IVALID 0x04
 
 #define SETTING_RELAYCLOSE "CURTAIN_RELAYCLOSE"
 #define SETTING_MAXPOSITION "CURTAIN_MAXPOSITION"
@@ -24,9 +25,12 @@ int32_t _MAX_POSITION;
 int32_t _INIT_POSITION = 0;
 uint8_t _RELAY_CLOSE = 0xFF;
 uint8_t _curtain_state = CURTAIN_STATE_IDLE;
+uint8_t _curtain_prev_state = CURTAIN_STATE_IVALID;
 uint8_t _curtain_target_relay = 0xFF;
 int32_t _curtain_target_position = 0;
 uint32_t _curtain_start_time = 0;
+uint32_t _eeprom_wrote_cnt = 0;
+bool _enable_drag = true;
 
 #if TERMINAL_SUPPORT
 
@@ -41,6 +45,7 @@ void _curtainInitCommands()
     settingsRegisterCommand(F("CURTAIN.EP"), [](Embedis *e) {
         _MAX_POSITION = _encoder->read();
         setSetting(SETTING_MAXPOSITION, _MAX_POSITION);
+        _eeprom_wrote_cnt++;
         DEBUG_MSG_P(PSTR("+OK\n"));
     });
 
@@ -66,6 +71,18 @@ void _curtainInitCommands()
     settingsRegisterCommand(F("CURTAIN.SPEEDTHRESHOLD"), [](Embedis *e) {
         if (e->argc > 1) {
             _SPEED_THRESHOLD = String(e->argv[1]).toInt();
+            setSetting(SETTING_SPEEDTHRESHOLD, _SPEED_THRESHOLD);
+            _eeprom_wrote_cnt++;
+            DEBUG_MSG_P(PSTR("+OK\n"));
+        }
+        else{
+            DEBUG_MSG_P(PSTR("Wrong number of arguments\n"));
+        }
+    });
+
+    settingsRegisterCommand(F("CURTAIN.ENDRAG"), [](Embedis *e) {
+        if (e->argc > 1) {
+            _enable_drag = String(e->argv[1]).toInt();
             DEBUG_MSG_P(PSTR("+OK\n"));
         }
         else{
@@ -79,6 +96,7 @@ void _curtainInitCommands()
         DEBUG_MSG_P(PSTR("Close relay: %d\n"), _RELAY_CLOSE);
         DEBUG_MSG_P(PSTR("Speed threshold: %d\n"), _SPEED_THRESHOLD);
         DEBUG_MSG_P(PSTR("Current state: %d\n"), _curtain_state);
+        DEBUG_MSG_P(PSTR("EEPROM wrote counter: %d\n"), _eeprom_wrote_cnt);
         DEBUG_MSG_P(PSTR("+OK\n"));
     });
 }
@@ -98,7 +116,7 @@ void curtainLearnDirection()
     }
 
     DEBUG_MSG_P(PSTR("learning direction\n"));
-    _curtain_state = CURTAIN_STATE_LEARN;
+    setTargetState(CURTAIN_STATE_LEARN);
     _curtain_start_time = millis();
 }
 
@@ -124,8 +142,10 @@ void curtainOperation(uint8_t pos_percent)
     _curtain_target_relay = (_curtain_target_position - _encoder->read())*_MAX_POSITION > 0 ? _RELAY_CLOSE : 1 - _RELAY_CLOSE;
     // convert to absolute value for easier understanding
     _curtain_target_position = abs(_curtain_target_position);
-    _curtain_state = CURTAIN_STATE_RUN;
+    setTargetState(CURTAIN_STATE_RUN);
     _curtain_start_time = millis();
+
+    DEBUG_MSG_P(PSTR("moving to position %d!\n"), _curtain_target_position);
 }
 
 //------------------------------------------------------------------------------
@@ -184,9 +204,9 @@ void curtainMQTTCallback(unsigned int type, const char *topic, const char *paylo
                 curtainOperation(100);
             }
             else if (strcmp(payload, "STOP") == 0) {
-                _curtain_state = CURTAIN_STATE_IDLE;
+                setTargetState(CURTAIN_STATE_IDLE);
                 _curtain_target_relay = 0xFF;
-                setSetting(SETTING_INITPOSITION, _encoder->read());
+                // setSetting(SETTING_INITPOSITION, _encoder->read());
             }
             return;
         }
@@ -231,6 +251,12 @@ void curtainSetup()
     {
         _INIT_POSITION = getSetting(SETTING_INITPOSITION).toInt();
     }
+    else
+    {
+        setSetting(SETTING_INITPOSITION, 0);
+        _eeprom_wrote_cnt++;
+    }
+    
     _encoder->write(_INIT_POSITION);
 
     if (hasSetting(SETTING_SPEEDTHRESHOLD))
@@ -249,10 +275,16 @@ void curtainSetup()
     espurnaRegisterLoop(curtainLoop);
 }
 
+void setTargetState(uint8_t state)
+{
+    _curtain_prev_state = _curtain_state;
+    _curtain_state = state;
+}
+
 void curtainLoop()
 {
     static uint32_t last_read_idle = 0;
-    static int32_t last_pos_idle = 0;
+    static int32_t last_pos_idle = _encoder->read();
 
     static unsigned long last_hbeat = 0;
     if (millis() - last_hbeat > 600000) {
@@ -278,8 +310,8 @@ void curtainLoop()
         relayStatus(0, false, false, false);
         _RELAY_CLOSE = abs(pos0) < abs(pos1) ? 0 : 1;
         DEBUG_MSG_P(PSTR("learning finished: close relay is %d\n"), _RELAY_CLOSE);
-        setSetting(SETTING_INITPOSITION, _encoder->read());
-        _curtain_state = CURTAIN_STATE_IDLE;
+        // setSetting(SETTING_INITPOSITION, _encoder->read());
+        setTargetState(CURTAIN_STATE_IDLE);
 
         // _SPEED_THRESHOLD = abs(pos1 - pos0);
         // setSetting(SETTING_SPEEDTHRESHOLD, _SPEED_THRESHOLD);
@@ -298,10 +330,21 @@ void curtainLoop()
             {
                 DEBUG_MSG_P(PSTR("stopped due to external force\n"));
                 relayStatus(_curtain_target_relay, false, false, false);
-                _curtain_state = CURTAIN_STATE_IDLE;
+                setTargetState(CURTAIN_STATE_IDLE);
                 _curtain_target_relay = 0xFF;
-                setSetting(SETTING_INITPOSITION, _encoder->read());
+                // setSetting(SETTING_INITPOSITION, _encoder->read());
+
+                // should be a position loss
+                int8_t current_pos_prc = abs(_encoder->read() * 100 / _MAX_POSITION);
+                if (current_pos >= 95) {
+                    _encoder->write(_MAX_POSITION);
+                    setSetting(SETTING_INITPOSITION, _MAX_POSITION);
+                    _eeprom_wrote_cnt++;
+                }
+                
+                last_pos = _encoder->read();
                 curtainMQTT();
+                return;
             }
             last_pos = _encoder->read();
         }
@@ -317,12 +360,12 @@ void curtainLoop()
             relayStatus(_curtain_target_relay, true, false, false);
             return;
         }
+        DEBUG_MSG_P(PSTR("stop moving, current posistion %d\n"), _encoder->read());
         relayStatus(_curtain_target_relay, false, false, false);
-        last_pos_idle = _encoder->read();
 
-        _curtain_state = CURTAIN_STATE_IDLE;
+        setTargetState(CURTAIN_STATE_IDLE);
         _curtain_target_relay = 0xFF;
-        setSetting(SETTING_INITPOSITION, _encoder->read());
+        // setSetting(SETTING_INITPOSITION, _encoder->read());
         curtainMQTT();
 
     }
@@ -330,9 +373,24 @@ void curtainLoop()
         relayStatus(0, false, false, false);
         relayStatus(1, false, false, false);
 
+        
+        if (_curtain_prev_state != _curtain_state) {
+            _curtain_prev_state = _curtain_state;
+            last_read_idle = millis();
+            last_pos_idle = _encoder->read();
+        }
+        
+
         if (millis() - last_read_idle > 3000){
+            // to ignore the inertial or wind
+            if (abs(getSetting(SETTING_INITPOSITION).toInt() - _encoder->read()) >= 5) {
+                setSetting(SETTING_INITPOSITION, _encoder->read());
+                _eeprom_wrote_cnt++;
+            }
+            
+            // detecting drag
             int32_t move = _encoder->read() - last_pos_idle;
-            if (abs(move) > 20) {                
+            if (abs(move) > 20 && _enable_drag) {                
                 if (move * _MAX_POSITION > 0) {
                     curtainOperation(100);
                 }
